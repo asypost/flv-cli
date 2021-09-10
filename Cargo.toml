@@ -1,10 +1,8 @@
-[package]
-name = "flv"
-version = "0.1.0"
-edition = "2018"
+[workspace]
+members= [
+    "flv-parser",
+    "flv-cli"
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-byteorder = "1"
-amf = "0.3"
+[patch.crates-io]
+amf = {git = "https://github.com/asypost/amf.git"}

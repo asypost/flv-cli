@@ -10,8 +10,16 @@ impl Segment {
     pub fn from_reader(reader: &mut impl Read) -> io::Result<Self> {
         let mut tag = None;
         let pre_tag_size = reader.read_u32::<BigEndian>()?;
-        if let Ok(t) = Tag::from_reader(reader) {
-            tag = Some(t);
+        match Tag::from_reader(reader) {
+            Ok(t) => {
+                tag = Some(t);
+            }
+            Err(e) => match e.kind() {
+                io::ErrorKind::UnexpectedEof => {}
+                _ => {
+                    return Err(e);
+                }
+            },
         }
         return Ok(Self { pre_tag_size, tag });
     }

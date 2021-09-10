@@ -10,6 +10,28 @@ fn be_to_u32(bytes: &[u8]) -> u32 {
     return result;
 }
 
+fn decode_script_data(data: &[u8]) -> io::Result<Vec<amf::Amf0Value>> {
+    let mut metas: Vec<amf::Amf0Value> = Vec::new();
+    let cur = &mut &data[..];
+    let mut decoder = amf::amf0::Decoder::new(cur);
+    loop {
+        match decoder.decode() {
+            Ok(val) => {
+                metas.push(val);
+            }
+            Err(e) => match e {
+                amf::error::DecodeError::Io(_) => {
+                    break;
+                }
+                _ => {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, e.to_string()));
+                }
+            },
+        }
+    }
+    return Ok(metas);
+}
+
 #[derive(Debug)]
 pub enum TagData {
     Script(Vec<amf::Amf0Value>),
@@ -59,20 +81,7 @@ impl Tag {
         } else if tp == Self::TYPE_VIDEO {
             TagData::Video(data)
         } else {
-            let mut metas: Vec<amf::Amf0Value> = Vec::new();
-            let cur = &mut &data[..];
-            let mut decoder = amf::amf0::Decoder::new(cur);
-            loop {
-                match decoder.decode() {
-                    Ok(val) => {
-                        metas.push(val);
-                    }
-                    Err(_) => {
-                        break;
-                    }
-                }
-            }
-            TagData::Script(metas)
+            TagData::Script(decode_script_data(&data)?)
         };
 
         return Ok(Self {
