@@ -31,7 +31,7 @@ fn main() {
                         .long("--out")
                         .takes_value(true)
                         .required(true)
-                        .help("output path"),
+                        .help("output path,- for stdout"),
                 ),
         )
         .get_matches();
