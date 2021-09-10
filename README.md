@@ -32,6 +32,6 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -o, --out <output>    output path
+    -o, --out <output>    output path,- for stdout
     -t, --type <type>     audio,video or all
 ```
