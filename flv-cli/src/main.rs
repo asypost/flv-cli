@@ -145,7 +145,7 @@ fn show_flv_info(file: &str) -> io::Result<()> {
             }
         }
     }
-    println!("flv version :{}", header.version());
+    println!("version: {}", header.version());
     println!("video: {}", if header.has_video() { "√" } else { "×" });
     println!("audio: {}", if header.has_audio() { "√" } else { "×" });
     if script.is_some() {

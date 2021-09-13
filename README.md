@@ -10,7 +10,7 @@ simple flv cli tool
 Show flv file metadata
 
 USAGE:
-    flv-cli.exe info
+    flv-cli.exe [FILE] info
 
 FLAGS:
     -h, --help       Prints help information
@@ -25,7 +25,7 @@ FLAGS:
 Extract video or audio from flv file
 
 USAGE:
-    flv-cli.exe extract --out <output> --type <type>
+    flv-cli.exe [FILE] extract --out <output> --type <type>
 
 FLAGS:
     -h, --help       Prints help information

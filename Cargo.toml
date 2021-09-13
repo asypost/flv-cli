@@ -3,6 +3,3 @@ members= [
     "flv-parser",
     "flv-cli"
 ]
-
-[patch.crates-io]
-amf = {git = "https://github.com/asypost/amf.git"}
