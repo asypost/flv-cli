@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{self, Read};
 
+#[derive(Debug, Clone)]
 pub struct Header {
     signature: [u8; 3],
     version: u8,
@@ -56,6 +57,16 @@ impl Header {
 
     pub fn has_audio(&self) -> bool {
         self.flags & Self::HEADER_AUDIO_FLAG == Self::HEADER_AUDIO_FLAG
+    }
+
+    pub fn set_has_video(&mut self, has_video: bool) {
+        let flag = if has_video { 0b11111111 } else { 0b11111110 };
+        self.flags &= flag;
+    }
+
+    pub fn set_has_audio(&mut self, has_audio: bool) {
+        let flag = if has_audio { 0b11111111 } else { 0b11111011 };
+        self.flags &= flag;
     }
 
     pub fn signature(&self) -> String {

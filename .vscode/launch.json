@@ -9,11 +9,12 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/flv-cli.exe",
-            "args": ["S:/我的资料库/我的资料库/影视/动漫/Rick and Morty/S01/0101.flv","info"],
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
-            "console": "externalTerminal"
+            "console": "externalTerminal",
+            "preLaunchTask":"rust: cargo build"
         }
     ]
 }

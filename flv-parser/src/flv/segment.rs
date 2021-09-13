@@ -1,6 +1,8 @@
 use super::tag::{Tag, TagData};
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{self, Read};
+
+#[derive(Debug, Clone)]
 pub struct Segment {
     pre_tag_size: u32,
     tag: Option<Tag>,

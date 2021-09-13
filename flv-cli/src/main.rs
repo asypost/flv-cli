@@ -55,7 +55,7 @@ fn main() {
 
 fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
     let mut fp = File::open(src)?;
-    let header = Header::from_reader(&mut fp)?;
+    let mut header = Header::from_reader(&mut fp)?;
     let stdout = io::stdout();
     let mut ofp: Box<dyn io::Write> = if path == "-" {
         Box::new(stdout.lock())
@@ -63,6 +63,13 @@ fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
         let out = File::create(path)?;
         Box::new(out)
     };
+    if tp != "all" {
+        if tp == "video" {
+            header.set_has_audio(false);
+        } else {
+            header.set_has_video(false);
+        }
+    }
     ofp.write_all(&header.into_bytes())?;
     let mut pre_tag_size = 0_u32;
     loop {

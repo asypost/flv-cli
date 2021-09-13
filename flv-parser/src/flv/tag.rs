@@ -32,14 +32,14 @@ fn decode_script_data(data: &[u8]) -> io::Result<Vec<amf::Amf0Value>> {
     return Ok(metas);
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub enum TagData {
     Script(Vec<amf::Amf0Value>),
     Audio(Vec<u8>),
     Video(Vec<u8>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tag {
     tp: u8,
     data_size: [u8; 3],
