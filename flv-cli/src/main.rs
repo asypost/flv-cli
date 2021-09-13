@@ -1,13 +1,20 @@
 use clap::{App, Arg, SubCommand};
-use flv_parser::amf::amf0::Value;
-use flv_parser::flv::{Header, Segment, TagData};
-use std::{fs::File, io};
+use flv_parser::flv::{Header, ParseResult, Parser, ScriptTagDataTrait, Segment, TagData};
+use std::{
+    fs::File,
+    io::{self, Read},
+    vec,
+};
 
 fn main() {
     let matches = App::new("flv cli")
         .version("0.1")
         .author("Shell asypost@gmail.com")
-        .arg(Arg::with_name("FILE").help("flv file").required(true))
+        .arg(
+            Arg::with_name("FILE")
+                .help("flv file,- for pipe")
+                .required(true),
+        )
         .subcommand(
             SubCommand::with_name("info")
                 .version("0.1")
@@ -54,8 +61,12 @@ fn main() {
 }
 
 fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
-    let mut fp = File::open(src)?;
-    let mut header = Header::from_reader(&mut fp)?;
+    let stdin = io::stdin();
+    let mut fp: Box<dyn Read> = if src == "-" {
+        Box::new(stdin.lock())
+    } else {
+        Box::new(File::open(src)?)
+    };
     let stdout = io::stdout();
     let mut ofp: Box<dyn io::Write> = if path == "-" {
         Box::new(stdout.lock())
@@ -63,35 +74,38 @@ fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
         let out = File::create(path)?;
         Box::new(out)
     };
-    if tp != "all" {
-        if tp == "video" {
-            header.set_has_audio(false);
-        } else {
-            header.set_has_video(false);
-        }
-    }
-    ofp.write_all(&header.into_bytes())?;
-    let mut pre_tag_size = 0_u32;
+    let mut parser = Parser::new();
+    let mut buffer: Vec<u8> = vec![0x00; 100 * 1024];
     loop {
-        if let Ok(mut seg) = Segment::from_reader(&mut fp) {
-            if !seg.has_tag() {
-                ofp.write_all(&seg.into_bytes())?;
-                pre_tag_size = 0;
-            } else {
-                seg.set_pre_tag_size(pre_tag_size);
-                if (tp == "video" || tp == "all") && seg.has_video_tag() {
-                    ofp.write_all(&seg.into_bytes())?;
-                    pre_tag_size = seg.tag().as_ref().unwrap().tag_size();
-                } else if (tp == "audio" || tp == "all") && seg.has_audio_tag() {
-                    ofp.write_all(&seg.into_bytes())?;
-                    pre_tag_size = seg.tag().as_ref().unwrap().tag_size();
-                } else if seg.has_script_tag() {
-                    ofp.write_all(&seg.into_bytes())?;
-                    pre_tag_size = seg.tag().as_ref().unwrap().tag_size();
+        let count = fp.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        parser.feed(&buffer[..count]);
+        loop {
+            let parse_result = parser.parse()?;
+            match parse_result {
+                ParseResult::MoreData(_bytes) => {
+                    break;
+                }
+                ParseResult::Header(header) => {
+                    ofp.write_all(&header.into_bytes())?;
+                    ofp.write_all(&0_u32.to_be_bytes())?;
+                }
+                ParseResult::PreTagSize(_) => {}
+                ParseResult::Tag(tag) => {
+                    if (tp == "video" || tp == "all") && tag.is_video_tag() {
+                        ofp.write_all(&tag.into_bytes())?;
+                        ofp.write_all(&tag.tag_size().to_be_bytes())?;
+                    } else if (tp == "audio" || tp == "all") && tag.is_audio_tag() {
+                        ofp.write_all(&tag.into_bytes())?;
+                        ofp.write_all(&tag.tag_size().to_be_bytes())?;
+                    } else if tag.is_script_tag() {
+                        ofp.write_all(&tag.into_bytes())?;
+                        ofp.write_all(&tag.tag_size().to_be_bytes())?;
+                    }
                 }
             }
-        } else {
-            break;
         }
     }
     return Ok(());
@@ -135,7 +149,12 @@ fn audio_codec_name(id: &f64) -> String {
 }
 
 fn show_flv_info(file: &str) -> io::Result<()> {
-    let mut fp = File::open(file)?;
+    let stdin = io::stdin();
+    let mut fp: Box<dyn Read> = if file == "-" {
+        Box::new(stdin.lock())
+    } else {
+        Box::new(File::open(file)?)
+    };
     let header = Header::from_reader(&mut fp)?;
     let mut script: Option<Segment> = Option::None;
     loop {
@@ -153,50 +172,24 @@ fn show_flv_info(file: &str) -> io::Result<()> {
         }
     }
     println!("version: {}", header.version());
-    println!("video: {}", if header.has_video() { "√" } else { "×" });
-    println!("audio: {}", if header.has_audio() { "√" } else { "×" });
+    println!("video: {}", if header.has_video() { "yes" } else { "no" });
+    println!("audio: {}", if header.has_audio() { "yes" } else { "no" });
     if script.is_some() {
-        let output_fields = [
-            "duration".to_string(),
-            "width".to_string(),
-            "height".to_string(),
-            "framerate".to_string(),
-            "videocodecid".to_string(),
-            "audiocodecid".to_string(),
-        ];
         let tag_seg = script.unwrap();
         let tag_data = tag_seg.tag().as_ref().unwrap().data();
         if let TagData::Script(values) = tag_data {
-            for value in values {
-                if let Value::EcmaArray { entries } = value {
-                    for kv in entries {
-                        if output_fields.contains(&kv.key) {
-                            if kv.key == "videocodecid".to_string() {
-                                print!("video codec:");
-                            } else if kv.key == "audiocodecid".to_string() {
-                                print!("audio codec:")
-                            } else {
-                                print!("{}: ", &kv.key);
-                            }
-                            match &kv.value {
-                                Value::String(s) => {
-                                    println!("{}", s);
-                                }
-                                Value::Number(n) => {
-                                    if kv.key == "videocodecid".to_string() {
-                                        println!("{}", video_codec_name(n));
-                                    } else if kv.key == "audiocodecid".to_string() {
-                                        println!("{}", audio_codec_name(n));
-                                    } else {
-                                        println!("{:.0}", n);
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            }
+            println!("duration: {:0.3}s", values.duration());
+            println!("width : {:0.0}", values.width());
+            println!("height: {:0.0}", values.height());
+            println!("fps: {:0.0}", values.framerate());
+            println!(
+                "video codec: {}",
+                video_codec_name(&values.video_codec_id())
+            );
+            println!(
+                "audio codec: {}",
+                audio_codec_name(&values.audio_codec_id())
+            );
         }
     }
     return Ok(());

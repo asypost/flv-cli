@@ -10,8 +10,8 @@ pub struct Header {
 }
 
 impl Header {
-    const HEADER_SIGNATURE: [u8; 3] = [0x46, 0x4C, 0x56];
-    const HEADER_SIZE: u32 = 0x09;
+    pub const HEADER_SIGNATURE: [u8; 3] = [0x46, 0x4C, 0x56];
+    pub const HEADER_SIZE: u32 = 0x09;
     const HEADER_VIDEO_FLAG: u8 = 0b00000001;
     const HEADER_AUDIO_FLAG: u8 = 0b00000100;
 
