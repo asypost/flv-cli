@@ -2,7 +2,7 @@ use clap::{App, Arg, SubCommand};
 use flv_parser::flv::{Header, ParseResult, Parser, ScriptTagDataTrait, Segment, TagData};
 use std::{
     fs::File,
-    io::{self, Read},
+    io::{self, BufWriter, Read, Write},
     vec,
 };
 
@@ -52,7 +52,11 @@ fn main() {
             if tp != "audio" && tp != "video" && tp != "all" {
                 println!("{}", args.usage());
             } else {
-                extract(file, tp, out).expect("Extract failed");
+                if let Err(e) = extract(file, tp, out) {
+                    if e.kind() != io::ErrorKind::BrokenPipe {
+                        eprintln!("Error: {}", e);
+                    }
+                }
             }
         }
     } else {
@@ -68,11 +72,10 @@ fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
         Box::new(File::open(src)?)
     };
     let stdout = io::stdout();
-    let mut ofp: Box<dyn io::Write> = if path == "-" {
-        Box::new(stdout.lock())
+    let mut ofp: BufWriter<Box<dyn io::Write>> = if path == "-" {
+        BufWriter::with_capacity(4 * 1024, Box::new(stdout.lock()))
     } else {
-        let out = File::create(path)?;
-        Box::new(out)
+        BufWriter::with_capacity(4 * 1024, Box::new(File::create(path)?))
     };
     let mut parser = Parser::new();
     let mut buffer: Vec<u8> = vec![0x00; 100 * 1024];
@@ -83,12 +86,13 @@ fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
         }
         parser.feed(&buffer[..count]);
         loop {
-            let parse_result = parser.parse()?;
-            match parse_result {
-                ParseResult::MoreData(_bytes) => {
+            match parser.parse()? {
+                ParseResult::MoreDataRequired(_bytes) => {
                     break;
                 }
-                ParseResult::Header(header) => {
+                ParseResult::Header(mut header) => {
+                    header.set_has_video((tp == "all" || tp == "video") && header.has_video());
+                    header.set_has_audio((tp == "all" || tp == "audio") && header.has_audio());
                     ofp.write_all(&header.into_bytes())?;
                     ofp.write_all(&0_u32.to_be_bytes())?;
                 }
@@ -108,6 +112,7 @@ fn extract(src: &str, tp: &str, path: &str) -> io::Result<()> {
             }
         }
     }
+    ofp.flush()?;
     return Ok(());
 }
 

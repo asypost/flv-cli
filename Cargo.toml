@@ -3,3 +3,7 @@ members= [
     "flv-parser",
     "flv-cli"
 ]
+
+[profile.release]
+codegen-units = 1
+lto = true

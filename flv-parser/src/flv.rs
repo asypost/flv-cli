@@ -31,25 +31,36 @@ impl Container {
     }
 }
 
+///Parser State
 enum ParserState {
+    ///Parsing Header with byte count required
     Header(usize),
+    ///Parsing PreTagSize with byte count required
     PreTagSize(usize),
+    ///Parsing Tag with byte count required
     Tag(usize),
 }
 
+///Parse result of the parser
 pub enum ParseResult {
-    MoreData(usize),
+    ///The parser need more data
+    MoreDataRequired(usize),
+    ///A flv header found
     Header(Header),
+    ///A previous tag size found
     PreTagSize(u32),
+    ///A tag found
     Tag(Tag),
 }
 
+///flv parser
 pub struct Parser {
     state: ParserState,
     buffer: Vec<u8>,
 }
 
 impl Parser {
+    ///Create a new praser
     pub fn new() -> Self {
         Self {
             state: ParserState::Header(Header::HEADER_SIZE as usize),
@@ -57,17 +68,42 @@ impl Parser {
         }
     }
 
+    ///Feed the parser with some data
     pub fn feed(&mut self, data: &[u8]) {
         if data.len() > 0 {
             self.buffer.extend_from_slice(data);
         }
     }
 
+    ///Start parse the data in buffer,you need to call this util it
+    ///returns a ParserResult::MoreDataRequired.
+    /// #Example
+    ///```
+    ///loop {
+    ///  parser.feed(&buf);
+    ///  loop {
+    ///    match parser.parse() {
+    ///      ParseResult::MoreDataRequired(size) => {
+    ///          break;
+    ///       },
+    ///       ParserState::Header(header) => {
+    ///
+    ///       },
+    ///       ParserState::PreTagSize(size) => {
+    ///
+    ///       },
+    ///       ParserState::Tag(tag) => {
+    ///
+    ///       }
+    ///    }    
+    ///  }
+    ///}
+    ///```
     pub fn parse(&mut self) -> io::Result<ParseResult> {
         match self.state {
             ParserState::Header(required) => {
                 if required > self.buffer.len() {
-                    return Ok(ParseResult::MoreData(required - self.buffer.len()));
+                    return Ok(ParseResult::MoreDataRequired(required - self.buffer.len()));
                 }
                 let header = Header::from_reader(&mut &self.buffer[..required])?;
                 let _ = self.buffer.drain(..required);
@@ -76,7 +112,7 @@ impl Parser {
             }
             ParserState::PreTagSize(required) => {
                 if required > self.buffer.len() {
-                    return Ok(ParseResult::MoreData(required - self.buffer.len()));
+                    return Ok(ParseResult::MoreDataRequired(required - self.buffer.len()));
                 }
                 let pre_tag_size = (&mut &self.buffer[..required]).read_u32::<BigEndian>()?;
                 let _ = self.buffer.drain(..required);
@@ -85,7 +121,7 @@ impl Parser {
             }
             ParserState::Tag(required) => {
                 if required > self.buffer.len() {
-                    return Ok(ParseResult::MoreData(required - self.buffer.len()));
+                    return Ok(ParseResult::MoreDataRequired(required - self.buffer.len()));
                 }
                 if required == Tag::TAG_HEADER_SIZE as usize {
                     let data_size = be_bytes_to_u32(&self.buffer[1..4]);
@@ -98,7 +134,7 @@ impl Parser {
                     let tag_size = required + data_size as usize;
                     if tag_size > self.buffer.len() {
                         self.state = ParserState::Tag(tag_size);
-                        return Ok(ParseResult::MoreData(tag_size - self.buffer.len()));
+                        return Ok(ParseResult::MoreDataRequired(tag_size - self.buffer.len()));
                     } else {
                         return self.parse_tag(tag_size);
                     }
@@ -109,6 +145,7 @@ impl Parser {
         }
     }
 
+    #[inline(always)]
     fn parse_tag(&mut self, required: usize) -> io::Result<ParseResult> {
         let tag = Tag::from_reader(&mut &self.buffer[..required])?;
         let _ = self.buffer.drain(..required);

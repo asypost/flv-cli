@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use std::io::{self, Read};
 
+///flv header
 #[derive(Debug, Clone)]
 pub struct Header {
     signature: [u8; 3],
@@ -15,6 +16,7 @@ impl Header {
     const HEADER_VIDEO_FLAG: u8 = 0b00000001;
     const HEADER_AUDIO_FLAG: u8 = 0b00000100;
 
+    ///Build a Header from something implements Read trait
     pub fn from_reader(reader: &mut impl Read) -> io::Result<Self> {
         let mut header = Header {
             signature: [0; 3],
@@ -43,32 +45,39 @@ impl Header {
         Ok(header)
     }
 
+    ///The version of flv
     pub fn version(&self) -> u8 {
         self.version
     }
 
+    ///The size of header
     pub fn size(&self) -> u32 {
         self.header_size
     }
 
+    ///Indicates that the flv header flags has video bit set
     pub fn has_video(&self) -> bool {
         self.flags & Self::HEADER_VIDEO_FLAG == Self::HEADER_VIDEO_FLAG
     }
 
+    ///Indicates that the flv header flags has audio bit set
     pub fn has_audio(&self) -> bool {
         self.flags & Self::HEADER_AUDIO_FLAG == Self::HEADER_AUDIO_FLAG
     }
 
+    ///Set video bit of flags
     pub fn set_has_video(&mut self, has_video: bool) {
         let flag = if has_video { 0b11111111 } else { 0b11111110 };
         self.flags &= flag;
     }
 
+    ///Set audio bit of flags
     pub fn set_has_audio(&mut self, has_audio: bool) {
         let flag = if has_audio { 0b11111111 } else { 0b11111011 };
         self.flags &= flag;
     }
 
+    ///Return the signature of flv.It should be "FLV"
     pub fn signature(&self) -> String {
         let mut s = String::with_capacity(3);
         s.insert(0, *self.signature.get(0).unwrap() as char);
@@ -77,6 +86,7 @@ impl Header {
         return s;
     }
 
+    ///Return the bytes of this header
     pub fn into_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::<u8>::with_capacity(9);
         bytes.extend_from_slice(&self.signature);
